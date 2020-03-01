@@ -15,7 +15,7 @@ class multi_head_attention(torch.nn.Module):
             value_filters: an integer
             output_depth: an integer
             num_heads: an integer dividing key_filters and value_filters
-            layer_type: a string, type of this layer -- SAME, DOWN, UP, Arbitrary
+            layer_type: a string, type of this layer -- SAME, DOWN, UP
         Returns:
             A Tensor of shape [batch, _h, _w, output_filters]
         
@@ -30,9 +30,9 @@ class multi_head_attention(torch.nn.Module):
         if value_filters % num_heads != 0:
             raise ValueError("Value depth (%d) must be divisible by the number of "
                             "attention heads (%d)." % (value_filters, num_heads))
-        if layer_type not in ['SAME', 'DOWN', 'UP', 'Arbitrary']:
+        if layer_type not in ['SAME', 'DOWN', 'UP']:
             raise ValueError("Layer type (%s) must be one of SAME, "
-                            "DOWN, UP, Arbitrary." % (layer_type))
+                            "DOWN, UP." % (layer_type))
 
         self.num_heads = num_heads
         self.layer_type = layer_type
@@ -47,9 +47,6 @@ class multi_head_attention(torch.nn.Module):
         elif layer_type == 'UP':
             self.QueryTransform = nn.ConvTranspose2d(in_channel, key_filters, kernel_size=3, stride=2,
                                 padding=1, bias=True)
-        elif layer_type == 'Arbitrary':
-            self.QueryTransform = nn.Conv2d(in_channel, key_filters, kernel_size=1, stride=1,
-                                            padding=0, bias=True)
 
         self.KeyTransform = nn.Conv2d(in_channel, key_filters, kernel_size=1, stride=1, padding=0, bias=True)
         self.ValueTransform = nn.Conv2d(in_channel, value_filters, kernel_size=1, stride=1, padding=0, bias=True)
@@ -59,7 +56,7 @@ class multi_head_attention(torch.nn.Module):
 
         self._scale = (key_filters // num_heads) ** 0.5
 
-    def forward(self, inputs, Arbitrary_shape = None):
+    def forward(self, inputs):
         """
         Arbitrary_shape: output shape (h, w)
         """
@@ -68,11 +65,6 @@ class multi_head_attention(torch.nn.Module):
             q = self.QueryTransform(inputs)
         elif self.layer_type == 'UP':
             q = self.QueryTransform(inputs, output_size=(inputs.shape[2]*2, inputs.shape[3]*2))
-        elif self.layer_type == 'Arbitrary':
-            q = self.QueryTransform(inputs)
-            if Arbitrary_shape == None:
-                Arbitrary_shape = (q.shape[2], q.shape[3])
-            q = F.interpolate(q, size=Arbitrary_shape, mode='bilinear', align_corners=False)
 
         k = self.KeyTransform(inputs).permute(0, 2, 3, 1)
         v = self.ValueTransform(inputs).permute(0, 2, 3, 1)
@@ -125,6 +117,6 @@ class multi_head_attention(torch.nn.Module):
 if __name__ == '__main__':
     device = torch.device('cpu')  #cuda:0
     inputs = torch.rand(20, 50, 50).unsqueeze(0).to(device)
-    net = multi_head_attention(20, 16, 16, 40, 2, 0.5, 'Arbitrary')   # 'SAME', 'DOWN', 'UP', 'Arbitrary'
-    res = net(inputs, (70, 70))
+    net = multi_head_attention(20, 16, 16, 40, 2, 0.5, 'UP')   # 'SAME', 'DOWN', 'UP'
+    res = net(inputs)
     print('res shape:', res.shape)
