@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 
-class multi_head_attention(torch.nn.Module):
+class multi_head_attention_2d(torch.nn.Module):
     def __init__(self, in_channel, key_filters, value_filters,
 							output_filters, num_heads, dropout_prob=0.5, layer_type='SAME'):
         super().__init__()
@@ -58,18 +58,20 @@ class multi_head_attention(torch.nn.Module):
 
     def forward(self, inputs):
         """
-        Arbitrary_shape: output shape (h, w)
+        :param inputs: B, C, H, W
+        :return: inputs: B, Co, Hq, Wq
         """
-        #[B, Hq, Wq, Ck]
+
         if self.layer_type == 'SAME' or self.layer_type == 'DOWN':
             q = self.QueryTransform(inputs)
         elif self.layer_type == 'UP':
             q = self.QueryTransform(inputs, output_size=(inputs.shape[2]*2, inputs.shape[3]*2))
 
+        # [B, Hq, Wq, Ck]
         k = self.KeyTransform(inputs).permute(0, 2, 3, 1)
         v = self.ValueTransform(inputs).permute(0, 2, 3, 1)
-
         q = q.permute(0, 2, 3, 1)
+
         Batch, Hq, Wq = q.shape[0], q.shape[1], q.shape[2]
 
         #[B, H, W, N, Ck]
@@ -92,8 +94,11 @@ class multi_head_attention(torch.nn.Module):
 
         # [(B, Hq, Wq, N), C]
         O =  torch.matmul(A, v)
+        # [B, Hq, Wq, C]
         O = O.view(Batch, Hq, Wq, v.shape[-1]*self.num_heads)
+        # [B, C, Hq, Wq]
         O = O.permute(0, 3, 1, 2)
+        # [B, Co, Hq, Wq]
         O = self.outputConv(O)
 
         return O
@@ -117,6 +122,6 @@ class multi_head_attention(torch.nn.Module):
 if __name__ == '__main__':
     device = torch.device('cpu')  #cuda:0
     inputs = torch.rand(20, 50, 50).unsqueeze(0).to(device)
-    net = multi_head_attention(20, 16, 16, 40, 2, 0.5, 'UP')   # 'SAME', 'DOWN', 'UP'
+    net = multi_head_attention_2d(20, 16, 16, 40, 2, 0.5, 'UP')   # 'SAME', 'DOWN', 'UP'
     res = net(inputs)
     print('res shape:', res.shape)
