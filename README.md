@@ -1,5 +1,5 @@
 # Non-local U-Net for Biomedical Image Segmentation
-Implement 2D global aggregation block of Non local U-Nets in pytorch.
+Implement 2D and 3D global aggregation block of Non local U-Nets in pytorch.
 
 
 
